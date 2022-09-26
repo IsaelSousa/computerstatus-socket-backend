@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 const os = require("os-utils");
 const nodeOs = require("os");
 const gpu = require("gpu-info");
+const { exec } = require("child_process");
 
 const io = new Server({
   cors: {
@@ -35,14 +36,34 @@ io.on("connection", (socket) => {
   setInterval(() => {
     const uptime = os.sysUptime();
     socket.volatile.emit("uptimehour", uptime);
-  }, 1000)
+  }, 1000);
 
   setInterval(() => {
-    gpu().then(data => {
-      console.log(data);
-    })
-  }, 1000)
+    exec('nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader', (err, stdout, stderr) => {
+      const parse = JSON.parse(stdout);
+      socket.volatile.emit("gputemperature", parse);
+    });
+  }, 1000);
+
+  setInterval(() => {
+    exec('nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader', (err, stdout, stderr) => {
+      const parse = JSON.parse(stdout.replace(' %', ''));
+      socket.volatile.emit("gputilization", parse);
+    });
+  }, 1000);
+
+  setInterval(() => {
+    exec('nvidia-smi --query-gpu=memory.total --format=csv,noheader', (err, stdout, stderr) => {
+      const parse = JSON.parse(stdout.replace(' MiB', ''));
+      socket.volatile.emit("gputotalmem", parse / 1024);
+    });
+  }, 1000);
 
 });
 
 io.listen(8080);
+
+    // exec('fast --upload --json', (err, stdout, stderr) => {
+    //     const parse = JSON.parse(stdout);
+    //     socket.emit('speed-test', parse);
+    // });
